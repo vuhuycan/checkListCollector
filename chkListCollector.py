@@ -7,12 +7,10 @@ import re
 from copy import copy
 import argparse
 import os
+import logging
 
 
-print('////////////////////////////////////////////////////////////////')
-print("chkListCollector v2.0r2022.08.05b, Beta. !!!No right reserved!!!")
-print('////////////////////////////////////////////////////////////////')
-print('')
+
 #v0.1r2022.04.01: support multiple commands in one row (main target is for FaultInsert and RepairVerif checklists)
 #v0.1r2022.04.02: fix bug: when there's multiple cmds in one row: print out wrong cmd/result, bad padding/coloring the inserted lines
 #v0.1r2022.04.04: now search for "Working dir" and "command" in arbitrary column, not fixed anymore
@@ -50,12 +48,15 @@ parser = argparse.ArgumentParser(description = "A Collector for your checklist."
 
 # add arguments
 parser.add_argument("-i","--inFile", nargs = 1, metavar = "file", type = str,
-                     help = "Specify your input xlsx file path. \
+                     help = "Specify your input xlsx file. \
                              Notes: - Only xlsx file is accepted.\
                                     - All pictures and drawing objects would not be kept in the output checklist.\
                                     These are restrictions of the openpyxl lib.")
 parser.add_argument("-o","--outFile", nargs = 1, metavar = "file", type = str,
-                     help = "Specify your output xlsx file path.") 
+                     help = "Specify your output xlsx file.") 
+parser.add_argument("-l","--logFile", nargs = '?', metavar = "file", type = str,
+                     help = "Specify name for log file.\
+                             By default, it is <inputfilename>.log.") 
 parser.add_argument("-sh","--enterBash", action = 'store_true',
                      help = "If there's error with a command, this switch allow you to enter bash terminal, \
                              allow you to type a new command and replace it in the checklist.") 
@@ -78,6 +79,10 @@ args = parser.parse_args()
 inputfile = args.inFile[0]
 outputfile = args.outFile[0]
 
+if args.logFile is not None:
+    logfile = args.logFile
+else: logfile = inputfile + '.log'
+
 enterBash = args.enterBash
 mergeEna = args.mergeAcross
 noDelForVi = args.keepViRslt
@@ -92,7 +97,23 @@ dbg = args.debug
 
 #TODO: build warning class, separate types of warning: dir not protected, cmd return code not 0, cmd result too long... info: added lines, ...
 wrnCnt = 0
-#TODO: build log file handling for this program
+#----------------------------------------------------
+
+#----------------------------------------------------
+#logfile handling
+#TODO when user inputs, they are not logged to log file
+#-------------------
+#logging.basicConfig(filename =logfile, filemode = 'w', level =logging.DEBUG) #encoding ='utf-8', 
+logger = logging.getLogger()
+logger.setLevel(logging.DEBUG)
+
+stdoutHandler = logging.StreamHandler(sys.stdout)
+stdoutHandler.setLevel(logging.DEBUG)
+logger.addHandler(stdoutHandler)
+
+logfilehandler = logging.FileHandler(logfile, mode = 'w')
+logfilehandler.setLevel(logging.DEBUG)
+logger.addHandler(logfilehandler)
 #----------------------------------------------------
 
 
@@ -153,7 +174,7 @@ class cmd:
        #if any(ref in cmd for ref in inhibitCmdList):
         if any(self.name.startswith(ref) for ref in inhibitCmdList):
             self.isCollectable = False
-            print ("!!WARNING!!: At row",self.row,", inhibited cmd: ",self.name)
+            logger.warn("!!WARNING!!: At row"+self.row+", inhibited cmd: "+self.name)
             wrnCnt = wrnCnt +1
            #aCmd.returncode = 0
            #aCmd.stdoutList = ['']
@@ -236,8 +257,8 @@ class cmd:
             if dbg: print('choice - ',self.choice)
         
         if self.choice == 'yes to all' or self.choice == 'y' :
-            print("when you want to leave bash$ and continue, type \"exit\"")
-            print("!!!NOTES!!!: \"cd\" cannot be used here. Be carefull with it.")
+            logger.info("when you want to leave bash$ and continue, type \"exit\"")
+            logger.info("!!!NOTES!!!: \"cd\" cannot be used here. Be carefull with it.")
             proceed = 0
             while (proceed == 0):
                 usrIn = input("bash$ ")
@@ -249,7 +270,7 @@ class cmd:
             sheet.cell(self.row,self.col).value = self.name #update the command in checklist
         
         if self.returncode !=0 :
-            print("!!WARNING!! returncode is",self.returncode,". Maybe there is error with above cmd.")
+            logger.warn("!!WARNING!! returncode is "+str(self.returncode)+". Maybe there is error with above cmd.")
             wrnCnt = wrnCnt +1
     #----------------------------------------------------
 
@@ -262,7 +283,7 @@ class cmd:
         #check if this cmd is 'vi' or 'vim', we can't execute this, since it halt the whole program:
         if self.isCollectable is False: return
         #Execute the command, so we have the precious result :      
-        print("At row",self.row," : ",self.name)
+        logger.info("At row"+str(self.row)+" : "+self.name)
         self.runCmd() 
         self.changeCmd() 
     #----------------------------------------------------
@@ -293,9 +314,15 @@ def isThisCellACmd(row,col,wkDir):
         return False
 #----------------------------------------------------
     
+    
+logger.info('////////////////////////////////////////////////////////////////')
+logger.info("chkListCollector v2.0r2022.08.05b, Beta. !!!No right reserved!!!")
+logger.info('////////////////////////////////////////////////////////////////')
+logger.info('')
 
-print('Opened ',inputfile)
-print('')
+
+logger.info('Opened '+inputfile)
+logger.info('')
 
 #get all worksheet in the file:
 workbk = openpyxl.load_workbook(filename = inputfile)
@@ -304,8 +331,8 @@ sheetNameList = workbk.sheetnames
 for i in sheetNameList:
 
     sheet = workbk[i]
-    print("OPENED SHEET ",i)
-    print('')
+    logger.info("OPENED SHEET "+i)
+    logger.info('')
     wkDirList = [] # <----- THE LIST OF WORKING DIR IN CURRENT SHEET.
 #----------------------------------------------------
 #search for all working dir in the sheet
@@ -315,7 +342,7 @@ for i in sheetNameList:
 #         + value: the actual directory
 #         + row/col: position of it in the sheet
 #-------------------
-    print('Start searching for \"workng dir\" keyword :')
+    logger.info('Start searching for \"workng dir\" keyword :')
     for row in range(sheet.min_row,sheet.max_row+1):
         for col in range(sheet.min_column,10):
             cellVal = sheet.cell(row,col).value
@@ -336,48 +363,48 @@ for i in sheetNameList:
                #print(wkDir)
                #if os.path.isdir(wkDir): break
             else: 
-                print("!!!WARNING!!! Found \"Working Dir\" key at row :",row,"but no actual Dir found!")
+                logger.warn("!!!WARNING!!! Found \"Working Dir\" key at row: "+str(row)+" but no actual Dir found!")
                 wrnCnt = wrnCnt +1
                 continue
 
             #if above loop breaks, means we found one, add it to our list to use later:
-            print ("Found workdir at row:",row,"col:",col,":")
-            print (wkDir)
+            logger.info ("Found workdir at row:"+str(row)+":")
+            logger.info (wkDir)
             #check if the working dir contain the string in dirProtect
             if dirProtect != 'dummy':
                 if ( not re.search(dirProtect,wkDir) ):
-                    print("!!!WARNING!!! The dir does not contain \"",dirProtect,"\"!")
+                    logger.warn("!!!WARNING!!! The dir does not contain \""+dirProtect+"\"!")
                     wrnCnt = wrnCnt +1
                     proceed = False
                 else: proceed = True
                 while proceed is False:
-                    print("Please type in a new one or ignore (type \"n\" for ignore):")
+                    logger.info("Please type in a new one or ignore (type \"n\" for ignore):")
                     wkDir = input()
                     if wkDir == 'n': 
                         proceed = True
                     elif not  re.search(dirProtect,wkDir)  :
-                        print("!!!WARNING!!! The dir does not contain \"",dirProtect,"\"!")
+                        logger.warn("!!!WARNING!!! The dir does not contain \""+dirProtect+"\"!")
                     elif not os.path.isdir(wkDir):
-                        print("!!!WARNING!!! This dir does not exists!")
+                        logger.warn("!!!WARNING!!! This dir does not exists!")
                     else: proceed = True
 
             wkDirObj = WorkDir(wkDir,row,col)
             wkDirList.append(wkDirObj)
    #print(wkDirList)
     wkDirList.append(WorkDir('dummy',sheet.max_row,sheet.max_column))
-    print('')
-    print('')
-    print('Finished looking for working dir. Start collecting checklist!')
-    print('')
-    print('')
-    print('')
+    logger.info('')
+    logger.info('')
+    logger.info('Finished looking for working dir in this sheet.')
+    logger.info('')
+    logger.info('')
+    logger.info('')
 #----------------------------------------------------
 
     for i in range(len(wkDirList)-1):#for all found "working dir":
-        print('-----------------------------------------------------------')
-        print('---COLLECTING RESULT IN',wkDirList[i].name,' ----:')
-        print('')
-        print('')
+        logger.info('-----------------------------------------------------------')
+        logger.info('---COLLECTING RESULT IN '+wkDirList[i].name+' ----:')
+        logger.info('')
+        logger.info('')
        #for row in range(wkDirList[i].row, wkDirList[i+1].row +1):#find cmd between two "working dir"
         row = wkDirList[i].row
         while  row < ( wkDirList[i+1].row +1 ) :
@@ -411,7 +438,7 @@ for i in sheetNameList:
                         merged_cells.shift(0,shiftLines)
                 #add rows
                 sheet.insert_rows(maxEndClrRow+1,amount=shiftLines)
-                print('At line',maxEndClrRow+1,',inserted',shiftLines,'lines.')
+                logger.info('At line '+str(maxEndClrRow +1) +',inserted '+str(shiftLines)+' lines.')
                 #update position for all "Working Dir"
                 for uprow in range(i+1,len(wkDirList)):
                     wkDirList[uprow].row = wkDirList[uprow].row + shiftLines
@@ -448,33 +475,31 @@ for i in sheetNameList:
             #end collecting in a row
             #----------------------------------------------------
         #end collecting in a "working dir"
-        print('')
-        print("-----------------------------------------------------------")
-        print('')
+        logger.info('')
+        logger.info("-----------------------------------------------------------")
+        logger.info('')
     #end collecting in a sheet
-    print('')
-    print("-----------------------------------------------------------")
-    print('')
-    print('')
+    logger.info('')
+    logger.info("-----------------------------------------------------------")
+    logger.info('')
+    logger.info('')
 #end whole workbook
-print("Completed collecting this checklist.")
-print("-----------------------------------------------------------")
-print('')
+logger.info("Completed collecting this checklist.")
+logger.info("-----------------------------------------------------------")
+logger.info('')
 
 if os.path.exists(outputfile):
     os.remove(outputfile)
-    print("WARNING! The file",outputfile,"exists. It would be replaced.")
+    logger.info("WARNING! The file "+outputfile+" exists. It would be replaced.")
 workbk.save(outputfile)
-print("Saved to file ",outputfile)
+logger.info("Saved to file " +outputfile)
 
-print('')
-print("-----------------------------------------------------------")
-print(wrnCnt,"WARNING")
-print("-----------------------------------------------------------")
-print('')
-print("Wish you all the best with the project!")
-print('')
-print("-----------------------------------------------------------")
-
-
-
+logger.info('')
+logger.info("-----------------------------------------------------------")
+logger.info(str(wrnCnt) +" WARNING")
+logger.info("-----------------------------------------------------------")
+logger.info('')
+logger.info("Wish you all the best with the project!")
+logger.info('')
+logger.info("-----------------------------------------------------------")
+logfilehandler.close()
