@@ -174,7 +174,7 @@ class cmd:
        #if any(ref in cmd for ref in inhibitCmdList):
         if any(self.name.startswith(ref) for ref in inhibitCmdList):
             self.isCollectable = False
-            logger.warn("!!WARNING!!: At row"+self.row+", inhibited cmd: "+self.name)
+            logger.warn("!!WARNING!!: At row"+str(self.row+)", inhibited cmd: "+self.name)
             wrnCnt = wrnCnt +1
            #aCmd.returncode = 0
            #aCmd.stdoutList = ['']
