@@ -1,0 +1,28 @@
+workbook = xlwings.Book(r'file path') return a book object
+workbook.app.visible = True/False
+workbook.app.screen_updating = True/False
+
+workbook.sheets[0] or .sheet['sheet name'] return a sheet object .sheets : return sheet collection
+sheet.cells Returns a Range object that represents all the cells on the Sheet (not just the cells that are currently in use).
+
+range method: return a Range object
+sheet.range('B2') = sheet.range(2,2)
+sheet.range('A1:B2') = sheet.range((1,1),(2,2)) 
+cell1 = sheet.range(1,1) (row index, col index) (row/column index start with 1)
+cell2 = sheet.range(2,2)
+sheet.range(cell1,cell2)
+
+sheet.range((1,1),(2,2)).value = [[None, None], [None, 'slijefoi ']]
+sheet.used_range : return used range 
+sheet.used_range.last_cell.column/row : max_row/max_column of the sheet.
+
+aRange.row/column : row/column index of the most top-left cell of the range
+aRange.last_cell.column/row : last_cell: most down-right cell of the range
+aRange.address : return '$B$2:$C$8'
+
+aRange.rows/columns(index) : return RangeRows/RangeColumns object
+for r in sheet.used_range.rows:
+	for c in r.columns:
+		iterable
+		
+
