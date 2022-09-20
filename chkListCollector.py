@@ -129,12 +129,12 @@ if args.resultLimit is not None:
 else: rsltLim = 200
 
 dbg = args.debug
-
+'''
 if args.xlwings:
     from usingxlwings import *
 else:
     from usingopenpyxl import *
-
+'''
 #TODO: build warning class, separate types of warning: dir not protected, cmd return code not 0, cmd result too long... info: added lines, ...
 wrnCnt = 0
 #----------------------------------------------------

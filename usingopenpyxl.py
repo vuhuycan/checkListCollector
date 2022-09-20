@@ -4,7 +4,7 @@ import openpyxl
 # classes definitions:
 # we have 3 types of object to deal with here:
 # + sheet : provided by openpyxl library
-# + cmd : the commands we want to run and paste to excel file
+# + Cmd : the commands we want to run and paste to excel file
 # + WorkDir : the directory that said commands runs on
 #-------------------
 class WorkDir:
@@ -47,7 +47,7 @@ class WorkDir:
       logger.info(f'row:{self.row}:col:{self.col}: {self.name}')
 
 
-class cmd:
+class Cmd:
     #class attribute (all instances of class WorkDir has same value)
    #color = cmdColor
    #if enterBash == True: choice = 'y'
@@ -290,7 +290,7 @@ def isThisCellACmd(cellVal,row,col,wkDir):
                 logger.debug(f'color is not same as defined cmdColor!')
                 return False
             #put the found command cell value, row and column to cmdDict:
-            cmdObj = cmd(refCmd['cmd'],cellVal,row,col,wkDir)
+            cmdObj = Cmd(refCmd['cmd'],cellVal,row,col,wkDir)
             cmdsInARowList.append(cmdObj)
             return True
     else:
